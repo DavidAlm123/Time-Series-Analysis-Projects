@@ -4,47 +4,39 @@ library(dplyr)
 library(tidyverse)
 library(pracma)
 library(forecast)
-ValueInvest_Global_A<-read_csv("ValueInvest_Global_A.csv")
+ValueInvest_Global_A<-read.csv("~/Desktop/KTH/SF2943/ProjektTS/ValueInvest_Global_A.csv")
 data<-ValueInvest_Global_A
 str(data)
 data$Date<-as.Date(data$Date)
 str(data)
 colnames(data)<-c("Date","High.price","Low.price","Closing.price")
-data
+which(is.na(data))
+data_ts=ts(data = data$Closing.price, frequency=252, start=c(2000,10))
 
+data_box <- BoxCox(data_ts, lambda="auto")
+box_diff <- diff(data_box)
+boxplot(box_diff)
 
-p<-ggplot(data,aes(x=Date,y=Closing.price)) + geom_line(color="#69b3a2") 
-p
-acf(data$Closing.price,lag.max=length(data$Closing.price),main="Plot of ACF against lag for closing price")
+quantlies <- quantile(box_diff,p = c(0.25, 0.75))
+i_q_r= IQR(box_diff)
 
-data$Closing.price <- detrend(data$Closing.price,tt="linear")
+fctr=4.9
 
-acf(data$Closing.price,lag.max=length(data$Closing.price),main="ACF against lag, after removing trends")
+upper_bound <- quantlies[2]+fctr*i_q_r
+lower_bound <- quantlies[1]-fctr*i_q_r
 
-p<-ggplot(data,aes(x=Date,y=Closing.price)) + geom_line(color="blue") + ggtitle("Time series after removing trend")+
-theme(plot.title = element_text(hjust = 0.5))
-p
+cleaned <- subset(box_diff, box_diff > (lower_bound) & box_diff < upper_bound)
+length(box_diff[box_diff > (lower_bound) & box_diff < upper_bound])
+removed_up <- which(box_diff > upper_bound)
+removed_down <- which(box_diff < lower_bound)
+data$Date[removed_down]
+data$Date[removed_up]
 
-#Almost identically zero. Fit AR model
-pacf(data$Closing.price,lag.max=length(data$Closing.price),main="Plot of PACF against lag for closing price")
+pacf(cleaned, lag.max=100)
 
-data$Closing.price <-data$Closing.price - mean(data$Closing.price)
+plot.ts(cleaned)
 
-fit <- auto.arima(y=data$Closing.price, stationary=TRUE, seasonal=FALSE)
-
-plot(forecast(fit,h=100))
-plot(fit$residuals)
-
-
-
-
-ma5pacf=ARMAacf(ma=fit$coef,lag.max=length(data$Closing.price),pacf=TRUE)
-plot(ma5pacf,type="h",main="Theoretical PACF for the model",xlab="Lag",ylab="PACF")
-ma5pac=ARMAacf(ma=fit$coef,lag.max=10)
-plot(ma5pac,type="h",main="Theoretical ACF for the model",xlab="Lag",ylab="PACF")
+adf.test(cleaned)
 
 
 
-
-
-  
